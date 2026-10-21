@@ -4,4 +4,4 @@ __pycache__/
 .pytest_cache/
 .pybuild/
 build/
-dist/*.tmp
+dist/

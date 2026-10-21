@@ -1,63 +1,75 @@
-# DeepCool Linux
+# DeepCool Control
 
-<img src="data/icons/hicolor/scalable/apps/io.github.deepcool.Control.svg" width="96" align="right" alt="DeepCool Linux icon">
+<img src="data/icons/hicolor/scalable/apps/io.github.deepcool.Control.svg" width="96" align="right" alt="DeepCool Control icon">
 
-A native **GTK4 / libadwaita** Linux application for DeepCool CH-series digital
-case displays. It reads hardware sensors locally and mirrors them to the two
-three-digit readouts and ten-cell load bars over USB HID.
-
-This is an independent Linux alternative to the display-control software
-available on the official
-[DeepCool download page](https://www.deepcool.com/downloadpage/). It is built
-for Linux desktops, with no Electron runtime, no background web view, and no
-telemetry.
+Native GTK4/libadwaita application for DeepCool CH-series digital case
+displays. It reads CPU and GPU sensors locally and drives the two three-digit
+readouts and ten-cell load bars over USB HID.
 
 ![Overview](docs/screenshots/overview.png)
 
-> **Educational project:** DeepCool Linux is not affiliated with, endorsed by,
-> or supported by DeepCool. Product names and trademarks belong to their
-> respective owners. Use it at your own risk.
+> **Independent project.** DeepCool Control is not affiliated with, endorsed by,
+> or supported by DeepCool. DeepCool and its product names are trademarks of
+> their respective owners. Use this software at your own risk.
 
-## Download and install
+The application controls the digital readout only. Case fan and ARGB lighting
+are outside its scope. It does not make network requests and does not require a
+browser runtime.
 
-Prebuilt packages are included in `dist/`. Choose the package for your
-distribution. Checksums are available in `dist/SHA256SUMS`; verify them with:
+## Supported hardware
+
+| Device | USB ID | Status |
+|---|---|---|
+| CH360 DIGITAL | `3633:0015` | Supported; used as the reference device |
+| CH560 DIGITAL | `3633:0005` | Same 64-byte protocol; not hardware-verified |
+| MORPHEUS | `3633:0007` | Same 64-byte protocol; not hardware-verified |
+
+Only known CH-series product IDs are opened. Other DeepCool USB devices are
+detected but never written to.
+
+## Install
+
+### Prebuilt packages
+
+CI publishes an RPM, a DEB, `SHA256SUMS`, and `BUILD-INFO.txt` for every push to
+`main` as a pre-release snapshot. Download the assets from the repository's
+Releases page and verify them before installing:
 
 ```bash
-cd dist
 sha256sum -c SHA256SUMS
 ```
 
-### Fedora, RHEL, and compatible RPM distributions
+#### Fedora, RHEL, and compatible RPM distributions
 
 ```bash
-sudo dnf install ./dist/deepcool-control-*.rpm
+sudo dnf install ./deepcool-control-*.rpm
 ```
 
-The package installs the application, desktop entry, icon, and udev permission
-rule. If your distribution does not use `dnf`, install the RPM directly:
+If `dnf` is unavailable:
 
 ```bash
-sudo rpm -i ./dist/deepcool-control-*.rpm
+sudo rpm -i ./deepcool-control-*.rpm
 ```
 
-### Debian, Ubuntu, Linux Mint, and compatible DEB distributions
+#### Debian, Ubuntu, Linux Mint, and compatible DEB distributions
 
 ```bash
-sudo apt install ./dist/deepcool-control_*.deb
+sudo apt install ./deepcool-control_*.deb
 ```
 
-The package installs the application, desktop entry, icon, and udev permission
-rule. On distributions without `apt`, use:
+If `apt` is unavailable:
 
 ```bash
-sudo dpkg -i ./dist/deepcool-control_*.deb
+sudo dpkg -i ./deepcool-control_*.deb
 sudo apt-get -f install
 ```
 
-### Run from the source tree
+Both packages install the application, desktop entry, icon, and the hidraw
+permission rule.
 
-No package installation is required for development:
+### From source
+
+The source launcher does not require installation:
 
 ```bash
 ./deepcool-control               # GUI
@@ -67,7 +79,7 @@ No package installation is required for development:
 ./deepcool-control --daemon      # headless updater
 ```
 
-### Per-user install
+Per-user install:
 
 ```bash
 ./install.sh
@@ -75,57 +87,17 @@ No package installation is required for development:
 deepcool-control
 ```
 
-The per-user install places the application in `~/.local/lib/deepcool-control`
-and the launcher in `~/.local/bin/deepcool-control`.
+This installs the application under `~/.local/lib/deepcool-control` and the
+launcher under `~/.local/bin/deepcool-control`.
 
-### System-wide install from source
+System-wide install:
 
 ```bash
 sudo ./install.sh --system
 ```
 
-This installs under `/usr/local` and installs the udev rule. Uninstall with
+This installs under `/usr/local` and installs the udev rule. Remove it with
 `sudo ./uninstall.sh --system`.
-
-## Features
-
-- **Hardware-accurate live preview** — seven-segment digits, unit, and ten-cell
-  bars are drawn exactly as the panel receives them.
-- **Two independent readouts** — CPU temperature/utilisation for the primary
-  readout; GPU temperature/utilisation, auto cycle, or off for the secondary.
-- **Independent auto cycle** — the primary and secondary readouts can each
-  alternate between temperature and utilisation on a configurable interval.
-- **Celsius or Fahrenheit** — with the same truncation behaviour as the
-  reference firmware.
-- **Adjustable refresh rate** — 0.25 s to 5 s.
-- **Sensor source selection** — choose the CPU temperature source (Tctl, Tccd,
-  package) and the discrete or integrated GPU.
-- **Live metrics** — CPU/GPU temperature and load, clock speed, memory use, NVMe
-  and other sensor readings, with sparklines.
-- **Native integration** — GNOME colour schemes, accent colours, systemd user
-  service, XDG autostart, desktop entry, and a udev permission helper.
-- **Safe device handling** — only known CH-series PIDs are opened, and an
-  advisory lock prevents the GUI and the background service from writing to the
-  same display at the same time.
-
-| Overview | Display |
-|---|---|
-| ![](docs/screenshots/overview.png) | ![](docs/screenshots/display.png) |
-
-| Sensors | Settings |
-|---|---|
-| ![](docs/screenshots/sensors.png) | ![](docs/screenshots/settings.png) |
-
-## Supported hardware
-
-| Product | USB PID | Status |
-|---|---|---|
-| CH360 DIGITAL | `3633:0015` | Supported and used as the reference device |
-| CH560 DIGITAL | `3633:0005` | Same 64-byte CH-series protocol |
-| MORPHEUS | `3633:0007` | Same 64-byte CH-series protocol |
-
-Other DeepCool USB products are detected and displayed as unsupported; the app
-will never send them an unknown packet.
 
 ## Requirements
 
@@ -147,107 +119,122 @@ Debian/Ubuntu:
 sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 python3-psutil
 ```
 
-## Build packages from source
+## Usage
 
-The packaging scripts use the version in `pyproject.toml` and write artifacts
-to `dist/`.
+The main window has four pages:
 
-### Build both packages
-
-```bash
-./packaging/build-all.sh
-```
-
-### Build the RPM
-
-```bash
-sudo dnf install rpm-build
-./packaging/build-rpm.sh
-```
-
-### Build the DEB
-
-The DEB builder works on any Linux host. It uses `dpkg-deb` when available and
-a portable `ar`-based fallback otherwise.
-
-```bash
-./packaging/build-deb.sh
-```
-
-Standard Debian packaging files are also provided in `debian/` for users who
-prefer `dpkg-buildpackage`.
-
-## Device permissions
-
-Linux exposes the display as `/dev/hidrawN` owned by `root:root` with mode
-`0600`. The included udev rule grants the active desktop session access through
-`TAG+="uaccess"`:
-
-```udev
-SUBSYSTEM=="hidraw", ATTRS{idVendor}=="3633", TAG+="uaccess", MODE="0660"
-```
-
-The RPM and DEB packages install and activate this rule. For a source install,
-use either of these:
-
-```bash
-./install.sh --udev
-```
-
-or open **Settings → Display permissions → Grant access** in the app. The app
-uses PolicyKit (`pkexec`) to install the rule and reload udev. Reconnect the
-display if it was already plugged in, then verify:
-
-```bash
-deepcool-control --doctor
-```
-
-The doctor output should show `writable=True` for the supported display.
-
-## Using the app
-
-- **Overview** shows the live panel preview, quick mode chips, and all live
-  metrics.
-- **Display** controls the primary/secondary readout, units, refresh interval,
+- **Overview** — live preview, quick mode controls, and current CPU/GPU metrics.
+- **Display** — primary and secondary readout modes, units, refresh interval,
   and auto-cycle interval.
-- **Sensors** selects the CPU temperature source and GPU, and lists other
-  hardware sensors. **Rescan** picks up hardware changes.
-- **Settings** controls the colour scheme, accent colour, preview animation,
-  autostart, background service, permissions, and diagnostics.
+- **Sensors** — CPU temperature source, GPU selection, and other hardware
+  sensors. **Rescan** refreshes the hardware list.
+- **Settings** — colour scheme, accent colour, preview animation, autostart,
+  background service, permissions, and diagnostics.
 
 Keyboard shortcuts:
 
 | Shortcut | Action |
 |---|---|
 | `Ctrl+1` … `Ctrl+4` | Switch pages |
-| `Ctrl+,` | Settings |
+| `Ctrl+,` | Open Settings |
 | `Ctrl+R` | Send the current reading immediately |
 | `F1` | About |
 | `Ctrl+Q` | Quit |
 
-The background service can be enabled under **Settings → Background service**.
-It writes packets through the same protocol and lock, so it can keep the display
-updated after the window is closed. If the service holds the display, the window
-shows a **Service** status and offers **Take over** in the sidebar. Settings
-changed in the window are picked up by the service within a few seconds.
+### Background service
 
-### Keep the display on 24/7
+The display is driven by status packets, not by the GUI. Enable
+**Settings → Background service** to keep it updated after the window is closed.
+The service is a systemd user unit with `Restart=always` and no restart limit.
 
-The panel has no independent power state: it stays lit while the daemon keeps
-sending status packets. Enable **Settings → Background service** so closing the
-window does not turn the display off. The generated systemd user unit restarts
-automatically and has no restart limit.
+```bash
+systemctl --user status deepcool-control
+journalctl --user -u deepcool-control -f
+```
 
-To keep the service running before login and after logout, enable lingering for
-your account:
+Settings changed in the window are picked up by the service within a few
+seconds. If the service owns the display, the window shows a **Service** status;
+use **Take over** only when you want the GUI to control the device directly.
+
+To keep the service running before login and after logout, enable lingering:
 
 ```bash
 loginctl enable-linger "$USER"
 ```
 
-## How it works
+To stop and disable it:
 
+```bash
+systemctl --user disable --now deepcool-control
+loginctl disable-linger "$USER"
 ```
+
+The panel has no independent power state. It stays lit only while the PC is
+powered and the USB cable is connected.
+
+## Configuration
+
+Configuration is stored in `~/.config/deepcool-control/config.json`. The file is
+validated on load; unknown or invalid values fall back to safe defaults rather
+than preventing startup.
+
+| Key | Default | Values |
+|---|---|---|
+| `primary` | `cpu_temp` | `cpu_temp`, `cpu_usage`, `auto` |
+| `secondary` | `gpu_temp` | `gpu_temp`, `gpu_usage`, `auto`, `off` |
+| `fahrenheit` | `false` | boolean |
+| `interval_ms` | `1000` | 250–5000 |
+| `auto_cycle_s` | `10` | 3–120 |
+| `cpu_sensor` | auto-detect | hwmon sensor ID |
+| `gpu_sensor` | auto-detect | GPU ID |
+| `accent` | `cyan` | `cyan`, `violet`, `emerald`, `amber`, `rose`, `blue` |
+| `color_scheme` | `system` | `system`, `light`, `dark` |
+| `animations` | `true` | boolean |
+| `autostart` | `false` | boolean |
+
+`auto` alternates between temperature and utilisation using `auto_cycle_s`.
+`primary` and `secondary` cycle independently.
+
+## Build packages
+
+The packaging scripts read the version from `pyproject.toml` and write artifacts
+to `dist/`. The directory is intentionally not tracked; release assets are built
+by CI.
+
+Build both packages:
+
+```bash
+./packaging/build-all.sh
+```
+
+Build the RPM (requires `rpm-build`):
+
+```bash
+sudo dnf install rpm-build
+./packaging/build-rpm.sh
+```
+
+Build the DEB (uses `dpkg-deb` when available, with a portable `ar` fallback):
+
+```bash
+./packaging/build-deb.sh
+```
+
+Standard Debian packaging files are available in `debian/` for users who prefer
+`dpkg-buildpackage`.
+
+### Continuous integration
+
+Every push to `main` runs the test suite, builds the RPM in a Fedora 44
+container and the DEB in a Debian 12 container, then publishes a pre-release
+tagged `snapshot-<short-commit>`. The release contains both packages,
+`SHA256SUMS`, and `BUILD-INFO.txt`. Failed tests block the release.
+`pyproject.toml` is the source of truth for the package version; snapshot tags
+identify the exact commit independently of that version.
+
+## Architecture
+
+```text
 src/deepcool_control/
 ├── protocol.py     64-byte CH-series HID report encoder
 ├── device.py       hidraw discovery, locking, safe writes
@@ -268,7 +255,7 @@ src/deepcool_control/
 
 ### HID packet layout
 
-The CH-series display accepts one 64-byte output report:
+The display accepts one 64-byte output report:
 
 | Byte | Meaning |
 |---|---|
@@ -291,43 +278,33 @@ behaviour.
 ```bash
 python3 -m unittest discover -s tests -v
 python3 -m compileall -q src
+bash -n install.sh uninstall.sh packaging/*.sh
 ./deepcool-control --simulate
 ```
 
 Demo mode (`--simulate` or `DEEPCOOL_DEMO=1`) uses simulated hardware so the UI
 can be developed without device permissions.
 
-Configuration is stored in `~/.config/deepcool-control/config.json`. The app
-validates the file on load and falls back to defaults rather than failing to
-start.
-
 ## Troubleshooting
 
-**The display shows "Permission"** — install the udev rule, reconnect the
-display, and run `--doctor`. On some systems the ACL is applied only after
-replugging or signing in again.
+**The display shows “Permission”** — install the udev rule, reconnect the
+display, and run `deepcool-control --doctor`. On some systems the ACL is applied
+only after replugging or signing in again.
 
-**The display shows "Service"** — the systemd user service owns the display.
-Use **Take over** in the sidebar, or disable the background service in Settings.
+**The display shows “Service”** — the systemd user service owns the display. Use
+**Take over** in the sidebar, or disable the background service in Settings.
 
 **No supported display found** — run `deepcool-control --list` and check the USB
-PID. Only CH360/CH560/MORPHEUS use this protocol.
+PID. Only CH360, CH560, and MORPHEUS use this protocol.
 
-**The vendor app is also installed** — close it before using DeepCool Linux.
-Two processes cannot safely drive the same HID report stream.
+**The vendor application is also running** — close it before using DeepCool
+Control. Two processes cannot safely drive the same HID report stream.
 
 **NVIDIA readings are missing** — install the proprietary driver tools so
 `nvidia-smi` is available, then press **Rescan** on the Sensors page.
 
-## Educational purpose
-
-DeepCool Linux is an educational and interoperability project. It demonstrates
-how to build a native Linux hardware application with GTK4, hwmon, psutil,
-hidraw, udev, systemd user services, and distribution packaging. The project is
-independent and is not an official DeepCool product.
-
-DeepCool and the names of its products are trademarks of their respective
-owners. All trademarks are used only to describe hardware compatibility.
+**The display turns off when the window closes** — enable the background service
+and verify it is active with `systemctl --user status deepcool-control`.
 
 ## License
 
