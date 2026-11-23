@@ -4,7 +4,9 @@
 
 Native GTK4/libadwaita application for DeepCool CH-series digital case
 displays. It reads CPU and GPU sensors locally and drives the two three-digit
-readouts and ten-cell load bars over USB HID.
+readouts and ten-cell load bars over USB HID. Case ARGB can be controlled from
+the Lighting page. MSI Mystic Light boards use a native HID backend; other
+controllers use OpenRGB.
 
 ![Overview](docs/screenshots/overview.png)
 
@@ -12,299 +14,232 @@ readouts and ten-cell load bars over USB HID.
 > or supported by DeepCool. DeepCool and its product names are trademarks of
 > their respective owners. Use this software at your own risk.
 
-The application controls the digital readout only. Case fan and ARGB lighting
-are outside its scope. It does not make network requests and does not require a
-browser runtime.
-
-## Supported hardware
+## Supported devices
 
 | Device | USB ID | Status |
 |---|---|---|
 | CH360 DIGITAL | `3633:0015` | Supported; used as the reference device |
-| CH560 DIGITAL | `3633:0005` | Same 64-byte protocol; not hardware-verified |
-| MORPHEUS | `3633:0007` | Same 64-byte protocol; not hardware-verified |
+| CH560 DIGITAL | `3633:0005` | Protocol-compatible; not hardware-verified |
+| MORPHEUS | `3633:0007` | Protocol-compatible; not hardware-verified |
 
-Only known CH-series product IDs are opened. Other DeepCool USB devices are
-detected but never written to.
+Only these display product IDs are accessed. The display itself does not expose
+RGB; case lighting is controlled separately from the Lighting page. MSI Mystic
+Light motherboards (USB `1462:7d77`) are handled by the native HID backend, so
+they do not need OpenRGB.
 
 ## Install
 
-### Prebuilt packages
+Download the `.rpm` or `.deb` from the latest release.
 
-CI publishes an RPM, a DEB, `SHA256SUMS`, and `BUILD-INFO.txt` for every push to
-`main` as a pre-release snapshot. Download the assets from the repository's
-Releases page and verify them before installing:
-
-```bash
-sha256sum -c SHA256SUMS
-```
-
-#### Fedora, RHEL, and compatible RPM distributions
+### Fedora and RHEL
 
 ```bash
 sudo dnf install ./deepcool-control-*.rpm
 ```
 
-If `dnf` is unavailable:
+The RPM is `noarch`, built on Fedora 44, and has no distribution suffix in its
+filename.
 
-```bash
-sudo rpm -i ./deepcool-control-*.rpm
-```
-
-#### Debian, Ubuntu, Linux Mint, and compatible DEB distributions
+### Debian and Ubuntu
 
 ```bash
 sudo apt install ./deepcool-control_*.deb
 ```
 
-If `apt` is unavailable:
+The package installs the application, desktop entry, icon, and hidraw
+permission rules for the display and for MSI Mystic Light controllers.
+Reconnect the display (or run `udevadm trigger`) after installing.
+
+## Run
 
 ```bash
-sudo dpkg -i ./deepcool-control_*.deb
-sudo apt-get -f install
-```
-
-Both packages install the application, desktop entry, icon, and the hidraw
-permission rule.
-
-### From source
-
-The source launcher does not require installation:
-
-```bash
-./deepcool-control               # GUI
-./deepcool-control --simulate    # demo mode, no hardware access
-./deepcool-control --doctor      # diagnostics
-./deepcool-control --list        # devices and sensor sources
-./deepcool-control --daemon      # headless updater
-```
-
-Per-user install:
-
-```bash
-./install.sh
-./install.sh --udev   # optional: install the hidraw permission rule
 deepcool-control
 ```
 
-This installs the application under `~/.local/lib/deepcool-control` and the
-launcher under `~/.local/bin/deepcool-control`.
+Both readouts can independently cycle between temperature and usage. Use the
+Display and Sensors pages to choose sources, units, refresh interval, and
+auto-cycle timing.
 
-System-wide install:
+### Keep the display and lighting running at boot
 
-```bash
-sudo ./install.sh --system
-```
+Enable **Settings → Background service**. This creates a systemd user unit that
+owns both the CH-series display and the native MSI per-LED lighting animation.
+The unit deliberately does **not** wait for `graphical-session.target`.
 
-This installs under `/usr/local` and installs the udev rule. Remove it with
-`sudo ./uninstall.sh --system`.
-
-## Requirements
-
-- Linux with Python 3.11+
-- GTK 4.14+ and libadwaita 1.5+
-- GObject Introspection bindings for GTK 4 and libadwaita
-- `python3-psutil`
-- Optional: `nvidia-smi` for NVIDIA GPU sensors
-
-Fedora:
+Enable lingering once so the user manager, and therefore this service, starts
+during boot instead of waiting for a login:
 
 ```bash
-sudo dnf install python3-gobject gtk4 libadwaita python3-psutil
+loginctl enable-linger "$USER"
 ```
 
-Debian/Ubuntu:
+The udev rules assign both hidraw devices to the `wheel` group in addition to
+the login-time `uaccess` ACL. That is the part that lets the boot-time service
+open the display and the MSI controller before the login prompt appears. On a
+system where the desktop user is not in `wheel`, either add them to that group
+or use the app's **Grant access** action and log in before relying on the
+pre-login service.
+
+If the rules were installed before this change, refresh the copies in
+`/etc/udev/rules.d` (they take precedence over the package copies), then
+reload udev:
 
 ```bash
-sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 python3-psutil
+sudo install -m 0644 data/99-deepcool-digital.rules \
+  data/99-deepcool-msi-mystic-light.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules
+sudo udevadm trigger --action=add --subsystem-match=hidraw
 ```
 
-## Usage
-
-The main window has four pages:
-
-- **Overview** — live preview, quick mode controls, and current CPU/GPU metrics.
-- **Display** — primary and secondary readout modes, units, refresh interval,
-  and auto-cycle interval.
-- **Sensors** — CPU temperature source, GPU selection, and other hardware
-  sensors. **Rescan** refreshes the hardware list.
-- **Settings** — colour scheme, accent colour, preview animation, autostart,
-  background service, permissions, and diagnostics.
-
-Keyboard shortcuts:
-
-| Shortcut | Action |
-|---|---|
-| `Ctrl+1` … `Ctrl+4` | Switch pages |
-| `Ctrl+,` | Open Settings |
-| `Ctrl+R` | Send the current reading immediately |
-| `F1` | About |
-| `Ctrl+Q` | Quit |
-
-### Background service
-
-The display is driven by status packets, not by the GUI. Enable
-**Settings → Background service** to keep it updated after the window is closed.
-The service is a systemd user unit with `Restart=always` and no restart limit.
+The next boot starts the service from the lingering user manager, before the
+login prompt. Verify with:
 
 ```bash
 systemctl --user status deepcool-control
 journalctl --user -u deepcool-control -f
 ```
 
-Settings changed in the window are picked up by the service within a few
-seconds. If the service owns the display, the window shows a **Service** status;
-use **Take over** only when you want the GUI to control the device directly.
+When the service is enabled, closing the window hands both devices to systemd
+and exits the GUI. Breathing, meteor, and the other animated MSI effects keep
+running, and the panel keeps updating. While the GUI is open it acts as a
+control panel: lighting changes are saved and the service applies them, so the
+GUI never opens a second MSI writer.
 
-To keep the service running before login and after logout, enable lingering:
+If the service is disabled, closing the window hides the app instead of
+quitting it. The display timer and the native RGB animation stay alive in the
+GUI process; open the app again to show the window. Use **Quit** from the menu
+to stop both when the service is disabled.
+
+The panel and the native MSI `JARGB_V2_2` stream are driven from Linux
+userspace. They cannot be active before the kernel has enumerated USB and this
+service has started; on the reference machine that happens a few seconds into
+boot, before the login prompt. The GPU effect is stored in the GPU firmware and
+is visible as soon as the card powers on; the service also reapplies the saved
+effect at startup as a safety net. The panel has no independent power state and
+stays lit while the PC is powered and the USB cable is connected.
+
+## Case lighting
+
+The **Lighting** page controls case and motherboard ARGB. This is a separate
+control path from the DeepCool display: the display's USB protocol only drives
+the numeric panel.
+
+### MSI Mystic Light (native)
+
+The native MSI backend was reverse-engineered and verified on this board:
+
+| Motherboard | USB ID | Cabinet ARGB header | Lighting page zone | Status |
+|---|---|---|---|---|
+| MSI PRO B650M-A WIFI (MS-7D77) | `1462:7d77` | `JARGB_V2_2` | `JRAINBOW2` | Supported; reference board |
+
+The cabinet fans are wired to **`JARGB_V2_2`**, exposed as **`JRAINBOW2`** in
+the Lighting page. `JARGB_V2_1` is exposed as `JRAINBOW1` but is unused on the
+reference system. Each JARGB header exposes 40 addressable LEDs in the native
+240-pixel frame.
+
+On this board the controller accepts the documented zone/effect packet
+(`0x52`), but its firmware effect engine does **not** drive the `JARGB_V2_2`
+fans. The native backend therefore switches the controller to direct mode and
+streams the per-LED frame (`0x53`). Static writes one frame and releases the
+HID device; animated effects render on the host at 30 fps and keep it open.
+With **Background service** enabled, the daemon owns this stream, so the
+animation continues after the window is closed. No firmware, EEPROM, fan, or
+voltage commands are sent.
+
+Native effects: `Static`, `Breathing`, `Flashing`, `Double flashing`, `Meteor`,
+`Blink`, `Color pulse`, `Color wave`, `Marquee`, `Visor`, `Rainbow flashing`,
+`Stack`, `Fire`, `Rainbow`, `Rainbow wave`, `Color cycle`, `Lightning`,
+`Color ring`, `Planetary`, `Double meteor`, `Energy`, `Clock`, and `Off`.
+
+The package installs the MSI hidraw permission rule
+(`99-deepcool-msi-mystic-light.rules`) so the app and the boot-time service can
+open `1462:7d77` without root. The rule grants persistent `wheel`-group access
+for the pre-login service and adds the login-time `uaccess` ACL.
+
+### ZOTAC RTX 4060 Ti GPU (patched OpenRGB)
+
+The reference GPU is a ZOTAC GeForce RTX 4060 Ti 8GB Twin Edge:
+
+| Property | Value |
+|---|---|
+| PCI device | `10de:2788` |
+| PCI subsystem | `19da:1747` |
+| RGB controller | `N702E-2001`, protocol `4A`, address `0x4A` |
+| Interface | NVIDIA Resource Manager I2C, 10 kHz |
+
+The GPU is independent from the MSI `JARGB_V2_2` cabinet chain. The stock
+OpenRGB package does not detect this card. `contrib/openrgb-zotac-4a/`
+contains a patch for the unmerged NVIDIA RM I2C backend ([OpenRGB MR
+!3380](https://gitlab.com/CalcProgrammer1/OpenRGB/-/merge_requests/3380)) and a
+Podman build script:
 
 ```bash
-loginctl enable-linger "$USER"
+cd contrib/openrgb-zotac-4a
+./build.sh
 ```
 
-To stop and disable it:
+The script installs the patched binary at `~/.local/bin/openrgb` and keeps any
+previous binary as a timestamped backup. `~/.local/bin` must come before
+`/usr/bin` in `PATH`; verify with `command -v openrgb`. The Lighting page then
+shows a separate **ZOTAC GPU** controller. The patch uses preset index `0` for
+`N702E-2001`, validates the controller ID to suppress the kernel-I2C duplicate,
+and does not replay a saved profile over the firmware state during detection.
+
+The GPU stores the selected effect in its own firmware, so it keeps running
+after OpenRGB or DeepCool Control exits. The background service does not own the
+GPU and never leaves an OpenRGB process running. It only issues a one-shot
+reapply at startup, after the NVIDIA driver is available, using a generated
+OpenRGB config that disables every detector except the ZOTAC 4A detector. That
+keeps the MSI detector from opening or disturbing `/dev/hidraw3`. The saved GPU
+effect and color are kept in separate `gpu_lighting_*` configuration keys, so
+selecting the GPU in the Lighting page never replaces the cabinet's native MSI
+settings.
+
+Other controllers are controlled through OpenRGB. The packages recommend it;
+install it if you have a non-MSI controller. For the reference ZOTAC GPU, use
+the patched build above instead of the distribution package:
 
 ```bash
-systemctl --user disable --now deepcool-control
-loginctl disable-linger "$USER"
+sudo dnf install openrgb
+sudo apt install openrgb
 ```
 
-The panel has no independent power state. It stays lit only while the PC is
-powered and the USB cable is connected.
+Choose the controller and zone, pick a color, and press **Apply**. Only one RGB
+writer may use a controller at a time; close MSI Center, OpenRGB effects, and
+other RGB tools before applying. If OpenRGB cannot see a non-MSI controller,
+sign out and back in so its udev rule is applied.
+
+### Lighting safety
+
+Safe mode is enabled by default. It allows only **Direct** mode, one ARGB zone,
+and at most **50%** brightness. **Preview** shows the exact native or OpenRGB
+command, and every apply is logged to
+`~/.local/state/deepcool-control/lighting.log` before it runs.
+
+The native MSI backend writes only the documented LED reports (`0x52` and
+`0x53`); it does not send firmware, EEPROM, fan, or voltage commands. OpenRGB
+MSI firmware effect modes have a history of hanging or bricking RGB
+controllers, and one all-zone `Meteor` write at 100% caused a hard shutdown on
+the reference machine. Turning safe mode off is possible, but effects,
+all-zone writes, and brightness above 50% require a confirmation dialog when
+using OpenRGB. Do not use `Meteor` on all zones at full brightness.
+
+If the machine shuts down after a lighting change, do not press **Apply** again
+until the ARGB wiring and power supply have been checked. The log shows the
+last command that was sent.
 
 ## Configuration
 
-Configuration is stored in `~/.config/deepcool-control/config.json`. The file is
-validated on load; unknown or invalid values fall back to safe defaults rather
-than preventing startup.
+Settings are stored in `~/.config/deepcool-control/config.json` and can be
+changed from the application.
 
-| Key | Default | Values |
-|---|---|---|
-| `primary` | `cpu_temp` | `cpu_temp`, `cpu_usage`, `auto` |
-| `secondary` | `gpu_temp` | `gpu_temp`, `gpu_usage`, `auto`, `off` |
-| `fahrenheit` | `false` | boolean |
-| `interval_ms` | `1000` | 250–5000 |
-| `auto_cycle_s` | `10` | 3–120 |
-| `cpu_sensor` | auto-detect | hwmon sensor ID |
-| `gpu_sensor` | auto-detect | GPU ID |
-| `accent` | `cyan` | `cyan`, `violet`, `emerald`, `amber`, `rose`, `blue` |
-| `color_scheme` | `system` | `system`, `light`, `dark` |
-| `animations` | `true` | boolean |
-| `autostart` | `false` | boolean |
+## Notes
 
-`auto` alternates between temperature and utilisation using `auto_cycle_s`.
-`primary` and `secondary` cycle independently.
-
-## Build packages
-
-The packaging scripts read the version from `pyproject.toml` and write artifacts
-to `dist/`. The directory is intentionally not tracked; release assets are built
-by CI.
-
-Build both packages:
-
-```bash
-./packaging/build-all.sh
-```
-
-Build the RPM (requires `rpm-build`):
-
-```bash
-sudo dnf install rpm-build
-./packaging/build-rpm.sh
-```
-
-Build the DEB (uses `dpkg-deb` when available, with a portable `ar` fallback):
-
-```bash
-./packaging/build-deb.sh
-```
-
-Standard Debian packaging files are available in `debian/` for users who prefer
-`dpkg-buildpackage`.
-
-### Continuous integration
-
-Every push to `main` runs the test suite, builds the RPM in a Fedora 44
-container and the DEB in a Debian 12 container, then publishes a pre-release
-tagged `snapshot-<short-commit>`. The release contains both packages,
-`SHA256SUMS`, and `BUILD-INFO.txt`. Failed tests block the release.
-`pyproject.toml` is the source of truth for the package version; snapshot tags
-identify the exact commit independently of that version.
-
-## Architecture
-
-```text
-src/deepcool_control/
-├── protocol.py     64-byte CH-series HID report encoder
-├── device.py       hidraw discovery, locking, safe writes
-├── sensors.py      hwmon, psutil, nvidia-smi and DRM sampling
-├── controller.py   GTK controller, scheduling and state
-├── daemon.py       headless systemd updater
-├── system.py       autostart, user service and udev integration
-├── app.py          CLI and Adw.Application
-└── ui/
-    ├── window.py       shell, sidebar and navigation
-    ├── dashboard.py    overview page
-    ├── display_page.py readout configuration
-    ├── sensors_page.py sensor source selection
-    ├── settings_page.py appearance and integration
-    ├── widgets.py      Cairo preview, sparklines and cards
-    └── style.css       Adwaita companion stylesheet
-```
-
-### HID packet layout
-
-The display accepts one 64-byte output report:
-
-| Byte | Meaning |
-|---|---|
-| `0` | Report ID `0x10` |
-| `1` | Primary mode: `19` = °C, `35` = °F, `76` = % |
-| `2` | Primary bar, 1–10 cells |
-| `3..5` | Primary digits, hundreds/tens/ones |
-| `6` | Secondary mode: same values, `0` = off |
-| `7` | Secondary bar, 1–10 cells |
-| `8..10` | Secondary digits |
-| `11..63` | Zero padding |
-
-Writing mode `170` in byte 1 once performs the panel start-up animation. Bars
-show at least one cell below 15 % utilisation and otherwise round to the nearest
-of ten cells; the encoder matches the firmware's round-half-away-from-zero
-behaviour.
-
-## Development
-
-```bash
-python3 -m unittest discover -s tests -v
-python3 -m compileall -q src
-bash -n install.sh uninstall.sh packaging/*.sh
-./deepcool-control --simulate
-```
-
-Demo mode (`--simulate` or `DEEPCOOL_DEMO=1`) uses simulated hardware so the UI
-can be developed without device permissions.
-
-## Troubleshooting
-
-**The display shows “Permission”** — install the udev rule, reconnect the
-display, and run `deepcool-control --doctor`. On some systems the ACL is applied
-only after replugging or signing in again.
-
-**The display shows “Service”** — the systemd user service owns the display. Use
-**Take over** in the sidebar, or disable the background service in Settings.
-
-**No supported display found** — run `deepcool-control --list` and check the USB
-PID. Only CH360, CH560, and MORPHEUS use this protocol.
-
-**The vendor application is also running** — close it before using DeepCool
-Control. Two processes cannot safely drive the same HID report stream.
-
-**NVIDIA readings are missing** — install the proprietary driver tools so
-`nvidia-smi` is available, then press **Rescan** on the Sensors page.
-
-**The display turns off when the window closes** — enable the background service
-and verify it is active with `systemctl --user status deepcool-control`.
+- Close the vendor application before running DeepCool Control. Only one process
+  can safely drive the display.
+- If the display is not detected, reconnect it after installation and check
+  **Settings → Diagnostics**.
+- NVIDIA GPU readings require `nvidia-smi`.
 
 ## License
 

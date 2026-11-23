@@ -1,3 +1,41 @@
+deepcool-control (1.2.4) unstable; urgency=medium
+
+  * Start the display and native MSI lighting during boot, before login.
+  * Grant persistent wheel-group access so the lingering service can open
+    the hidraw devices without waiting for a graphical login.
+  * Reapply the saved ZOTAC GPU effect at startup without touching MSI.
+
+ -- DeepCool Linux contributors <noreply@example.com>  Fri, 23 Oct 2026 00:00:00 +0000
+
+deepcool-control (1.2.3) unstable; urgency=medium
+
+  * Let the background service own the display and native MSI lighting.
+  * Hand off both devices when the window closes so animations continue.
+  * Hide the window instead of quitting when the service is disabled.
+
+ -- DeepCool Linux contributors <noreply@example.com>  Thu, 22 Oct 2026 00:00:00 +0000
+
+deepcool-control (1.2.2) unstable; urgency=medium
+
+  * Use a native MSI Mystic Light HID backend for MS-7D77 boards.
+  * Render Lighting effects on the host and stream per-LED frames.
+  * Fall back to OpenRGB for non-MSI controllers.
+
+ -- DeepCool Linux contributors <noreply@example.com>  Thu, 22 Oct 2026 00:00:00 +0000
+
+deepcool-control (1.2.1) unstable; urgency=medium
+
+  * Guard MSI Mystic Light writes with a safe mode, risk confirmation, and
+    an exact-command log.
+
+ -- DeepCool Linux contributors <noreply@example.com>  Thu, 22 Oct 2026 00:00:00 +0000
+
+deepcool-control (1.2.0) unstable; urgency=medium
+
+  * Add case and motherboard ARGB control through OpenRGB.
+
+ -- DeepCool Linux contributors <noreply@example.com>  Thu, 22 Oct 2026 00:00:00 +0000
+
 deepcool-control (1.1.3) unstable; urgency=medium
 
   * Reload display settings changed in the GUI while the background service runs.

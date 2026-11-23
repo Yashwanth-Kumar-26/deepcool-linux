@@ -73,7 +73,7 @@ def _print_devices() -> int:
 def _print_doctor() -> int:
     from .device import discover_devices
     from .sensors import cpu_model_name, list_gpus
-    from . import system
+    from . import lighting, system
 
     print(f"{APP_NAME} {VERSION}")
     print(f"Python: {platform.python_version()}")
@@ -124,11 +124,30 @@ def _print_doctor() -> int:
     print()
 
     print(f"udev rule: {'installed' if system.udev_rule_installed() else 'missing'}")
+    print(
+        f"MSI udev rule: "
+        f"{'installed' if system.msi_udev_rule_installed() else 'missing'}"
+    )
     print(f"service: {'active' if system.service_active() else 'inactive'}")
     print(f"service enabled: {system.service_enabled()}")
     print(f"service file: {system.service_path()}")
     print(f"autostart file: {system.autostart_path()}")
     print(f"config file: {_config_path()}")
+    openrgb = lighting.find_binary()
+    print(f"OpenRGB: {openrgb or 'not found'}")
+    try:
+        rgb_devices = lighting.list_devices(openrgb)
+    except lighting.LightingError as exc:
+        print(f"RGB devices: error: {exc}")
+    else:
+        print(f"RGB devices: {len(rgb_devices)}")
+        for device in rgb_devices:
+            zones = ", ".join(device.zones) or "-"
+            backend = "native" if device.native else "openrgb"
+            print(
+                f"  [{device.index}] {device.name} backend={backend} "
+                f"zones={zones} modes={len(device.modes)}"
+            )
     print()
     if not any(info.supported and os.access(info.path, os.W_OK) for info in devices):
         print("No writable supported display found. Install the udev rule using the app.")
@@ -208,9 +227,11 @@ def _run_gui(demo: bool = False) -> int:
                 if start_page:
                     self.window.show_page(start_page, animate=False)
                 self._apply_scheme()
+                self.withdraw_notification("background")
                 self.window.present()
                 self.controller.start()
             else:
+                self.withdraw_notification("background")
                 self.window.present()
 
         def _apply_scheme(self) -> None:
@@ -228,13 +249,24 @@ def _run_gui(demo: bool = False) -> int:
         def do_shutdown(self) -> None:
             if self.controller is not None and not self._stopped:
                 self._stopped = True
+                config = self.controller.config
+                lighting.stop_native()
                 self.controller.shutdown()
+                if config.service and not self.controller.demo:
+                    # Release both hidraw devices before asking systemd to
+                    # take over the display and the native MSI lighting.
+                    from . import system
+
+                    system.set_service(True)
             Adw.Application.do_shutdown(self)
 
         def do_startup(self) -> None:
             Adw.Application.do_startup(self)
             self.set_accels_for_action("app.quit", ["<Control>q"])
             self.set_accels_for_action("app.about", ["F1"])
+            show = Gio.SimpleAction.new("show-window", None)
+            show.connect("activate", lambda _action, _param: self.activate())
+            self.add_action(show)
 
     if demo:
         os.environ["DEEPCOOL_DEMO"] = "1"

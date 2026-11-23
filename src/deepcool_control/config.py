@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
@@ -11,7 +12,9 @@ from typing import Any
 
 APP_ID = "io.github.deepcool.Control"
 APP_NAME = "DeepCool Control"
-VERSION = "1.1.3"
+VERSION = "1.2.4"
+LIGHTING_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+DEFAULT_LIGHTING_COLOR = "#22D3EE"
 
 ACCENTS: dict[str, tuple[str, str]] = {
     # name: (primary, soft background tint)
@@ -47,6 +50,17 @@ class Config:
     autostart: bool = False
     service: bool = False
     color_scheme: str = "system"
+    lighting_device: str = ""
+    lighting_zone: str = ""
+    lighting_color: str = DEFAULT_LIGHTING_COLOR
+    lighting_mode: str = "Direct"
+    lighting_brightness: int = 35
+    lighting_safe_mode: bool = True
+    gpu_lighting_enabled: bool = False
+    gpu_lighting_device: str = ""
+    gpu_lighting_mode: str = ""
+    gpu_lighting_color: str = ""
+    gpu_lighting_brightness: int = 100
 
     def validate(self) -> "Config":
         if self.primary not in ("cpu_temp", "cpu_usage", "auto"):
@@ -59,6 +73,61 @@ class Config:
             self.accent = "cyan"
         if self.color_scheme not in ("system", "light", "dark"):
             self.color_scheme = "system"
+        self.lighting_device = str(self.lighting_device or "").strip()
+        self.lighting_zone = str(self.lighting_zone or "").strip()
+        if not isinstance(self.lighting_color, str) or not LIGHTING_COLOR_RE.fullmatch(
+            self.lighting_color
+        ):
+            self.lighting_color = DEFAULT_LIGHTING_COLOR
+        else:
+            self.lighting_color = self.lighting_color.upper()
+        self.lighting_mode = str(self.lighting_mode or "Direct").strip() or "Direct"
+        try:
+            self.lighting_brightness = int(self.lighting_brightness)
+        except (TypeError, ValueError):
+            self.lighting_brightness = 35
+        self.lighting_brightness = max(0, min(100, self.lighting_brightness))
+        self.lighting_safe_mode = bool(self.lighting_safe_mode)
+        if self.lighting_safe_mode:
+            # Effect modes and full brightness are what triggered the MSI
+            # Mystic Light shutdown.  Keep stored settings safe even when the
+            # configuration file is edited by hand.
+            self.lighting_mode = "Direct"
+            self.lighting_brightness = min(50, self.lighting_brightness)
+
+        # GPU lighting is independent from the MSI cabinet chain.  It has its
+        # own settings so selecting the GPU in the app never stops the native
+        # MSI animation.  Safe mode only guards the MSI controller; the ZOTAC
+        # firmware effects are supported and tested.
+        self.gpu_lighting_enabled = bool(self.gpu_lighting_enabled)
+        self.gpu_lighting_device = str(self.gpu_lighting_device or "").strip()
+        self.gpu_lighting_mode = str(self.gpu_lighting_mode or "").strip()
+        if (
+            not isinstance(self.gpu_lighting_color, str)
+            or not self.gpu_lighting_color.strip()
+        ):
+            self.gpu_lighting_color = ""
+        else:
+            color = self.gpu_lighting_color.strip()
+            if not color.startswith("#"):
+                color = f"#{color}"
+            if LIGHTING_COLOR_RE.fullmatch(color):
+                self.gpu_lighting_color = color.upper()
+            else:
+                self.gpu_lighting_color = ""
+        try:
+            self.gpu_lighting_brightness = int(self.gpu_lighting_brightness)
+        except (TypeError, ValueError):
+            self.gpu_lighting_brightness = 100
+        self.gpu_lighting_brightness = max(
+            0, min(100, self.gpu_lighting_brightness)
+        )
+        if not (
+            self.gpu_lighting_device
+            and self.gpu_lighting_mode
+            and self.gpu_lighting_color
+        ):
+            self.gpu_lighting_enabled = False
         return self
 
     @property

@@ -1,9 +1,12 @@
 %global appdir %{_prefix}/lib/deepcool-control
+# systemd-rpm-macros defines this on Fedora, but keep the spec usable in
+# minimal build roots where the macro package is not installed.
+%{!?_udevrulesdir:%global _udevrulesdir %{_prefix}/lib/udev/rules.d}
 
 Name:           deepcool-control
-Version:        1.1.3
-Release:        1%{?dist}
-Summary:        Native GTK4 app for DeepCool CH-series digital displays
+Version:        1.2.4
+Release:        1
+Summary:        Native GTK4 app for DeepCool CH-series displays and case lighting
 
 License:        MIT
 Source0:        %{name}-%{version}.tar.gz
@@ -16,12 +19,17 @@ Requires:       libadwaita
 Requires:       python3
 Requires:       python3-gobject
 Requires:       python3-psutil
+Recommends:     openrgb
 
 %description
 DeepCool Control is a native GTK4/libadwaita app for DeepCool CH-series
 digital case displays. It reads CPU and GPU temperature and utilisation
 locally and drives the two three-digit readouts and ten-cell load bars over
 USB HID.
+
+Case and motherboard ARGB can be controlled from the Lighting page. MSI
+Mystic Light boards are driven through a native HID backend; other
+controllers use OpenRGB.
 
 Supported displays include CH360 DIGITAL, CH560 DIGITAL and MORPHEUS.
 
@@ -59,6 +67,8 @@ install -m 0644 data/icons/hicolor/scalable/apps/io.github.deepcool.Control.svg 
   %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/io.github.deepcool.Control.svg
 install -m 0644 data/99-deepcool-digital.rules \
   %{buildroot}%{_udevrulesdir}/99-deepcool-digital.rules
+install -m 0644 data/99-deepcool-msi-mystic-light.rules \
+  %{buildroot}%{_udevrulesdir}/99-deepcool-msi-mystic-light.rules
 
 %check
 desktop-file-validate data/io.github.deepcool.Control.desktop
@@ -84,8 +94,25 @@ fi
 %{_datadir}/applications/io.github.deepcool.Control.desktop
 %{_datadir}/icons/hicolor/scalable/apps/io.github.deepcool.Control.svg
 %{_udevrulesdir}/99-deepcool-digital.rules
+%{_udevrulesdir}/99-deepcool-msi-mystic-light.rules
 
 %changelog
+* Fri Oct 23 2026 DeepCool Linux contributors - 1.2.4-1
+- Start the display and native MSI lighting during boot, before login
+- Reapply the saved GPU lighting effect at startup
+
+* Thu Oct 22 2026 DeepCool Linux contributors - 1.2.3-1
+- Keep the display and native MSI lighting running through the background service
+
+* Thu Oct 22 2026 DeepCool Linux contributors - 1.2.2-1
+- Use a native MSI Mystic Light HID backend on MS-7D77 and render effects on the host
+
+* Thu Oct 22 2026 DeepCool Linux contributors - 1.2.1-1
+- Guard MSI Mystic Light writes with a safe mode, risk confirmation, and command log
+
+* Thu Oct 22 2026 DeepCool Linux contributors - 1.2.0-1
+- Add case and motherboard ARGB control through OpenRGB
+
 * Thu Oct 22 2026 DeepCool Linux contributors - 1.1.3-1
 - Reload display settings changed in the GUI while the background service runs
 
